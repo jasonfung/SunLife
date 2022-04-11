@@ -8,8 +8,8 @@ const actions = [
 ];
  
 const columns = [   
-    { label: 'Account Name', fieldName: 'AccountURL', type: 'url', typeAttributes: {label: {fieldName: 'Name'}, target: '_blank'}, sortable: true },
-    { label: 'Account Owner', fieldName: 'OwnerName', sortable: true },
+    { label: 'Account Name', fieldName: 'AccountURL', sortBy: 'Name', type: 'url', typeAttributes: {label: {fieldName: 'Name'}, target: '_blank'}, sortable: true },
+    { label: 'Account Owner', fieldName: 'OwnerName', sortBy: 'OwnerName', sortable: true },
     { label: 'Phone', fieldName: 'Phone', type: 'phone' },
     { label: 'Website', fieldName: 'Website', type: 'url' },
     { label: 'Annual Revenue', fieldName: 'AnnualRevenue', type: 'currency' },
@@ -26,7 +26,7 @@ export default class accountDataTableJason extends NavigationMixin( LightningEle
     sortedBy;
     defaultSortDirection = 'asc';
     sortDirection = 'asc';
- 
+    
     connectedCallback(){
         const searchKey = '';
         findAccounts( { searchKey } )   
@@ -92,8 +92,8 @@ export default class accountDataTableJason extends NavigationMixin( LightningEle
 
         const { fieldName: sortedBy, sortDirection } = event.detail;
         const cloneData = [...this.accounts];
-
-        cloneData.sort( this.sortBy( sortedBy, sortDirection === 'asc' ? 1 : -1 ) );
+        const sortFieldName = this.columns.find(field=>sortedBy===field.fieldName).sortBy;
+        cloneData.sort( this.sortBy( sortFieldName, sortDirection === 'asc' ? 1 : -1 ) );
         this.accounts = cloneData;
         this.sortDirection = sortDirection;
         this.sortedBy = sortedBy;
