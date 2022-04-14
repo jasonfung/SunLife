@@ -19,7 +19,10 @@
                                          default-sort-direction={defaultSortDirection}
                                          sorted-direction={sortDirection}
                                          sorted-by={sortedBy}
-                                         onsort={onHandleSort}>
+                                         onsort={onHandleSort}
+                                         onsave={handleSave}
+                                         draft-values={draftValues}
+                                         >
                     </lightning-datatable>
  
                 </div>                  
@@ -27,9 +30,7 @@
             </template>
      
             <template if:true = {error}>
- 
-                {error}>
-                 
+                <p style="color: red; font-weight: bold;">Error: {error}</p> 
             </template>
  
         </div>

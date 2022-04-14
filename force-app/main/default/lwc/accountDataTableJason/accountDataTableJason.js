@@ -1,91 +1,61 @@
-import { LightningElement } from 'lwc';
+import { LightningElement, wire } from 'lwc';
 import findAccounts from '@salesforce/apex/sunlifeAccountController.findAccounts';
+import updateAccounts from '@salesforce/apex/sunlifeAccountController.updateAccounts';
+import { refreshApex } from '@salesforce/apex';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { NavigationMixin } from 'lightning/navigation';
-
+ 
 const actions = [
     { label: 'View', name: 'view' },
     { label: 'Edit', name: 'edit' },
 ];
- 
+
 const columns = [   
     { label: 'Account Name', fieldName: 'AccountURL', sortBy: 'Name', type: 'url', typeAttributes: {label: {fieldName: 'Name'}, target: '_blank'}, sortable: true },
     { label: 'Account Owner', fieldName: 'OwnerName', sortBy: 'OwnerName', sortable: true },
-    { label: 'Phone', fieldName: 'Phone', type: 'phone' },
-    { label: 'Website', fieldName: 'Website', type: 'url' },
-    { label: 'Annual Revenue', fieldName: 'AnnualRevenue', type: 'currency' },
+    { label: 'Phone', fieldName: 'Phone', type: 'phone', editable: true },
+    { label: 'Website', fieldName: 'Website', type: 'url', editable: true },
+    { label: 'Annual Revenue', fieldName: 'AnnualRevenue', type: 'currency', editable: true },
     {
         type: 'action',
         typeAttributes: { rowActions: actions },
-    },
+    }
 ];
 
-export default class accountDataTableJason extends NavigationMixin( LightningElement ) {
+export default class accountDataTableJason extends NavigationMixin( LightningElement ) {    
     accounts;
+    searchString = '';
     error;
     columns = columns;
     sortedBy;
     defaultSortDirection = 'asc';
     sortDirection = 'asc';
+    draftValues = [];
+    wiredActivities;
     
-    connectedCallback(){
-        const searchKey = '';
-        findAccounts( { searchKey } )   
-            .then(result => {
-                this.accounts = result.map(row=>{
-                    return{...row, OwnerName: row.Owner.Name, Name: row.Name, AccountURL: '/' + row.Id}
-                }) 
-            })
-            .catch(error => {
- 
-                this.error = error;
- 
+    @wire(findAccounts, {searchKey: '$searchString'}) 
+    wireAccounts(value) {
+        this.wiredActivities = value; // track the provisioned value
+        const { data, error } = value; // destructure the provisioned value
+        if (data) {
+            this.accounts = data.map(row=>{
+                return{...row, OwnerName: row.Owner.Name, Name: row.Name, AccountURL: '/' + row.Id}
             });
-    } 
-
-    handleKeyChange(event) {
-         
-        const searchKey = event.target.value;
-        
-        findAccounts( { searchKey } )   
-            .then(result => {
-                this.accounts = result.map(row=>{
-                    return{...row, OwnerName: row.Owner.Name, Name: row.Name, AccountURL: '/' + row.Id}
-                }) 
-            })
-            .catch(error => {
- 
-                this.error = error;
- 
-            }); 
+            this.error = undefined;
+        }
+        else if (error) {
+            this.accounts =undefined;
+            this.error = 'Unknown error';
+            if (Array.isArray(error.body)) {
+                this.error = error.body.map(e => e.message).join(', ');
+            } else if (typeof error.body.message === 'string') {
+                this.error = error.body.message;
+            }
+        }
     }
 
-    handleRowAction( event ) {
-
-        const actionName = event.detail.action.name;
-        const row = event.detail.row;
-        switch ( actionName ) {
-            case 'view':
-                this[NavigationMixin.Navigate]({
-                    type: 'standard__recordPage',
-                    attributes: {
-                        recordId: row.Id,
-                        actionName: 'view'
-                    }
-                });
-                break;
-            case 'edit':
-                this[NavigationMixin.Navigate]({
-                    type: 'standard__recordPage',
-                    attributes: {
-                        recordId: row.Id,
-                        objectApiName: 'Account',
-                        actionName: 'edit'
-                    }
-                });
-                break;
-            default:
-        }
-
+    handleKeyChange(event) {
+        this.searchString = event.target.value;
     }
     
     onHandleSort( event ) {
@@ -118,4 +88,64 @@ export default class accountDataTableJason extends NavigationMixin( LightningEle
 
     }
 
+    async handleSave(event) {
+        const updatedFields = event.detail.draftValues;
+
+        // Clear all datatable draft values
+        this.draftValues = [];
+
+        try {
+            // Pass edited fields to the updateAccounts Apex controller
+            await updateAccounts({ accountsForUpdate: updatedFields });
+
+            // Report success with a toast
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: 'Success',
+                    message: 'Accounts updated',
+                    variant: 'success'
+                })
+            );
+
+            // Display fresh data in the datatable
+            await refreshApex(this.wiredActivities);
+        } catch (error) {
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: 'Error while updating or refreshing records',
+                    message: error.body.message,
+                    variant: 'error'
+                })
+            );
+        }
+    }
+
+    handleRowAction( event ) {
+
+        const actionName = event.detail.action.name;
+        const row = event.detail.row;
+        switch ( actionName ) {
+            case 'view':
+                this[NavigationMixin.Navigate]({
+                    type: 'standard__recordPage',
+                    attributes: {
+                        recordId: row.Id,
+                        actionName: 'view'
+                    }
+                }); 
+                break;
+            case 'edit':
+                this[NavigationMixin.Navigate]({
+                    type: 'standard__recordPage',
+                    attributes: {
+                        recordId: row.Id,
+                        objectApiName: 'Account',
+                        actionName: 'edit'
+                    }
+                });
+                break;
+            default:
+        }
+
+    }
 }
